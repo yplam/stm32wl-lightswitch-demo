@@ -13,6 +13,11 @@ version = "1"
 default-features = false
 features = ["derive"]
 
-[dependencies.nucleo-wl55jc-bsp]
+#[dependencies.nucleo-wl55jc-bsp]
+#version = "0.6"
+#features = ["stm32wl5x_cm4", "rt", "defmt", "chrono"]
+
+[dependencies.m401-bsp]
+path = "../m401-bsp"
 version = "0.6"
-features = ["stm32wl5x_cm4", "rt", "defmt", "chrono"]
+features = ["stm32wle5", "rt", "defmt", "chrono"]

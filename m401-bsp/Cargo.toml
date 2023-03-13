@@ -1,0 +1,50 @@
+
+[package]
+edition = "2021"
+rust-version = "1.60"
+name = "m401-bsp"
+version = "0.6.1"
+description = "Board support package for the M401"
+readme = "README.md"
+keywords = [
+    "arm",
+    "cortex-m",
+    "stm32",
+    "bsp",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
+license = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+all-features = false
+features = [
+    "stm32wle5",
+    "rt",
+    "embedded-time",
+    "chrono",
+]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
+[dependencies.defmt]
+version = "0.3"
+optional = true
+
+[dependencies.stm32wlxx-hal]
+version = "=0.6.1"
+
+[features]
+chrono = ["stm32wlxx-hal/chrono"]
+defmt = [
+    "stm32wlxx-hal/defmt",
+    "dep:defmt",
+]
+embedded-time = ["stm32wlxx-hal/embedded-time"]
+rt = ["stm32wlxx-hal/rt"]
+stm32wle5 = ["stm32wlxx-hal/stm32wle5"]

@@ -1,26 +1,22 @@
 #![no_std]
 #![no_main]
 
-use bsp::{
-    led::{Led, Red},
-    pb::{Pb3, PushButton},
-    RfSwitch,
-};
 use core::{
     convert::{TryFrom, TryInto},
     mem::size_of,
 };
+
 use defmt::unwrap;
-use defmt_rtt as _; // global logger
+use defmt_rtt as _;
+// global logger
 use hal::{
     adc::{self, Adc},
     aes::Aes,
     chrono::{NaiveDate, NaiveDateTime},
     cortex_m::{delay::Delay, peripheral::syst::SystClkSource},
     dma::{AllDma, Dma1Ch1, Dma1Ch2},
-    embedded_hal::digital::v2::ToggleableOutputPin,
     embedded_hal::timer::CountDown,
-    gpio::{pins, Exti, ExtiTrg, Output, PortA, PortB, PortC, RfBusy},
+    gpio::{Exti, ExtiTrg, PortA, PortB, RfBusy},
     info,
     lptim::{self, LpTim, LpTim1},
     rcc,
@@ -28,13 +24,20 @@ use hal::{
     rtc::{self, Rtc},
     subghz::{Irq, SleepCfg, Startup, StatusMode, SubGhz},
 };
-use nucleo_wl55jc_bsp::{
+use panic_probe as _;
+
+use bsp::{
+    led::{Led, Red},
+    pb::{Pb3, PushButton},
+    RfSwitch,
+};
+use m401_bsp::{
     self as bsp,
     hal::{self, pac},
 };
-use panic_probe as _; // panic handler
+// panic handler
 use shared::{
-    setup_radio_with_payload_len, BASE_PACKET_PARAMS, IV_AND_TAG_LEN, PRIV_KEY, TIMEOUT_100_MILLIS,
+    BASE_PACKET_PARAMS, IV_AND_TAG_LEN, PRIV_KEY, setup_radio_with_payload_len, TIMEOUT_100_MILLIS,
 };
 
 const SLEEP_CFG: SleepCfg = SleepCfg::new()
@@ -141,7 +144,7 @@ fn locked_radio(
     }
 }
 
-#[rtic::app(device = nucleo_wl55jc_bsp::hal::pac)]
+#[rtic::app(device = m401_bsp::hal::pac)]
 mod app {
     use super::*;
 
@@ -195,11 +198,10 @@ mod app {
 
         let gpioa: PortA = PortA::split(dp.GPIOA, &mut dp.RCC);
         let gpiob: PortB = PortB::split(dp.GPIOB, &mut dp.RCC);
-        let gpioc: PortC = PortC::split(dp.GPIOC, &mut dp.RCC);
-        let mut b3: Output<pins::B3> = Output::default(gpiob.b3, cs);
-        b3.toggle().unwrap();
-        let d5: Red = Red::new(gpiob.b11, cs);
-        let _ = Pb3::new(gpioc.c6, cs);
+        // let mut b3: Output<pins::B3> = Output::default(gpiob.b3, cs);
+        // b3.toggle().unwrap();
+        let d5: Red = Red::new(gpiob.b3, cs);
+        let _ = Pb3::new(gpioa.a4, cs);
         <Pb3 as PushButton>::Pin::setup_exti_c1(&mut dp.EXTI, &mut dp.SYSCFG, ExtiTrg::Falling);
 
         let adc: Adc = Adc::new(dp.ADC, adc::Clk::RccSysClk, &mut dp.RCC);
@@ -208,7 +210,7 @@ mod app {
         let rng: Rng = Rng::new(dp.RNG, rng::Clk::Msi, &mut dp.RCC);
 
         let delay: Delay = Delay::new(cp.SYST, rcc::cpu1_systick_hz(&dp.RCC, SystClkSource::Core));
-        let rfs: RfSwitch = RfSwitch::new(gpioc.c3, gpioc.c4, gpioc.c5, cs);
+        let rfs: RfSwitch = RfSwitch::new(gpiob.b0, gpioa.a8, cs);
 
         let dma: AllDma = AllDma::split(dp.DMAMUX, dp.DMA1, dp.DMA2, &mut dp.RCC);
         let sg: SubGhz<Dma1Ch1, Dma1Ch2> =
@@ -353,9 +355,9 @@ mod app {
     }
 
     #[task(
-        binds = ADC,
-        shared = [adc, aes, sg, rfs, rng, rtc],
-        local = [buf: [u32; 64] = [0; 64]]
+    binds = ADC,
+    shared = [adc, aes, sg, rfs, rng, rtc],
+    local = [buf: [u32; 64] = [0; 64]]
     )]
     fn vbat(mut ctx: vbat::Context) {
         let buf: &mut [u32; 64] = ctx.local.buf;
@@ -420,7 +422,7 @@ mod app {
 
                 let msg: shared::Message = shared::Message {
                     vbat,
-                    data: "Hello, World!"
+                    data: "Hello, World!",
                 };
 
                 let filled: &mut [u8] = match postcard::to_slice(&msg, remainder) {
@@ -458,9 +460,9 @@ mod app {
     }
 
     #[task(
-        binds = RADIO_IRQ_BUSY,
-        shared = [sg, rfs, rtc, lptim1, aes, time_sync_nonce, time_sync_requested],
-        local = [buf: [u32; 64] = [0; 64]]
+    binds = RADIO_IRQ_BUSY,
+    shared = [sg, rfs, rtc, lptim1, aes, time_sync_nonce, time_sync_requested],
+    local = [buf: [u32; 64] = [0; 64]]
     )]
     fn radio(ctx: radio::Context) {
         let buf: &mut [u32; 64] = ctx.local.buf;

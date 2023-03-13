@@ -1,37 +1,44 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _; // global logger
-use panic_probe as _; // panic handler
+use defmt_rtt as _;
+// global logger
+use panic_probe as _;
 
-use nucleo_wl55jc_bsp::{
+use m401_bsp::{
     self as bsp,
     hal::{self, pac},
 };
 
+// panic handler
+
 // WARNING will wrap-around eventually, use this for relative timing only
 defmt::timestamp!("{=u32:us}", pac::DWT::cycle_count() / 48);
 
-#[rtic::app(device = nucleo_wl55jc_bsp::hal::pac)]
+#[rtic::app(device = m401_bsp::hal::pac)]
 mod app {
-    use super::{bsp, hal, pac};
-    use bsp::{
-        led::{Led, Red},
-        RfSwitch,
-    };
     use core::{convert::TryInto, mem::size_of};
+
     #[allow(unused_imports)]
     use defmt::{assert, assert_eq, unwrap};
     use hal::{
         aes::Aes,
         chrono::naive::{NaiveDate, NaiveDateTime},
         dma::{AllDma, Dma1Ch1, Dma1Ch2},
-        gpio::{PortB, PortC},
+        gpio::PortB,
         rcc,
         rtc::{self, Rtc},
         subghz::{GenericPacketParams, Irq, SubGhz, Timeout},
     };
-    use shared::{setup_radio, BASE_PACKET_PARAMS, IV_AND_TAG_LEN, PRIV_KEY, TIMEOUT_100_MILLIS};
+
+    use bsp::{
+        led::{Led, Red},
+        RfSwitch,
+    };
+    use m401_bsp::hal::gpio::PortA;
+    use shared::{BASE_PACKET_PARAMS, IV_AND_TAG_LEN, PRIV_KEY, setup_radio, TIMEOUT_100_MILLIS};
+
+    use super::{bsp, hal, pac};
 
     #[shared]
     struct Shared {}
@@ -68,11 +75,11 @@ mod app {
         cp.DWT.enable_cycle_counter();
         cp.DWT.set_cycle_count(0);
 
+        let gpioa: PortA = PortA::split(dp.GPIOA, &mut dp.RCC);
         let gpiob: PortB = PortB::split(dp.GPIOB, &mut dp.RCC);
-        let gpioc: PortC = PortC::split(dp.GPIOC, &mut dp.RCC);
-        let d5: Red = Red::new(gpiob.b11, cs);
+        let d5: Red = Red::new(gpiob.b3, cs);
 
-        let mut rfs: RfSwitch = RfSwitch::new(gpioc.c3, gpioc.c4, gpioc.c5, cs);
+        let mut rfs: RfSwitch = RfSwitch::new(gpiob.b0, gpioa.a8, cs);
 
         let dma: AllDma = AllDma::split(dp.DMAMUX, dp.DMA1, dp.DMA2, &mut dp.RCC);
         let mut sg: SubGhz<Dma1Ch1, Dma1Ch2> =
@@ -111,12 +118,12 @@ mod app {
     }
 
     #[task(
-        binds = RADIO_IRQ_BUSY,
-        local = [
-            sg, rfs, led, aes, rtc,
-            buf: [u32; 64] = [0; 64],
-            time_sync_cnt: u32 = 0,
-        ]
+    binds = RADIO_IRQ_BUSY,
+    local = [
+    sg, rfs, led, aes, rtc,
+    buf: [u32; 64] = [0; 64],
+    time_sync_cnt: u32 = 0,
+    ]
     )]
     fn radio(ctx: radio::Context) {
         let sg = ctx.local.sg;

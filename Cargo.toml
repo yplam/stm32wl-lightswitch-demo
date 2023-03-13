@@ -1,5 +1,5 @@
 [workspace]
-members = ["client", "server", "shared"]
+members = ["client", "server", "shared", "m401-bsp"]
 
 [profile.dev]
 codegen-units = 1
